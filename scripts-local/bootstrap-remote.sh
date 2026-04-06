@@ -135,11 +135,21 @@ test_ssh_connection() {
     local user=$3
     
     log_info "Проверка SSH подключения к ${user}@${host}:${port}..."
+    log_info "DEBUG: SSHPASS='$SSHPASS'"
+    
+    # Проверить что sshpass доступен
+    if [[ ! -x "$SSHPASS" ]]; then
+        log_error "ОШИБКА: $SSHPASS не найден или не исполняемый"
+        log_error "Пожалуйста, установи sshpass:"
+        log_error "  brew install sshpass"
+        return 1
+    fi
     
     local output
     local exit_code=0
     
-    output=$(timeout 10 $SSHPASS -p "$SSH_PASSWORD" ssh -p "$port" -o ConnectTimeout=5 \
+    # Использовать полный путь с кавычками для безопасности
+    output=$(timeout 10 "$SSHPASS" -p "$SSH_PASSWORD" ssh -p "$port" -o ConnectTimeout=5 \
         -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
         "$user@$host" "echo 'SSH OK'" 2>&1) || exit_code=$?
     
@@ -178,14 +188,14 @@ ensure_git_on_server() {
     
     log_info "Проверка git на сервере..."
     
-    if $SSHPASS -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+    if "$SSHPASS" -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
         -o UserKnownHostsFile=/dev/null "$user@$host" "command -v git" > /dev/null 2>&1; then
         log_success "git уже установлен на сервере"
         return 0
     fi
     
     log_warn "git не найден, устанавливаю..."
-    $SSHPASS -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+    "$SSHPASS" -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
         -o UserKnownHostsFile=/dev/null "$user@$host" \
         "apt-get update -qq && apt-get install -y git" || {
         log_error "Не удалось установить git на сервере"
@@ -207,18 +217,18 @@ deploy_repo() {
     
     # Создать директорию если её нет
     log_info "Создание директории: $deploy_dir"
-    $SSHPASS -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+    "$SSHPASS" -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
         -o UserKnownHostsFile=/dev/null "$user@$host" "mkdir -p $deploy_dir" || {
         log_error "Не удалось создать директорию"
         return 1
     }
     
     # Проверить есть ли уже репозиторий
-    if $SSHPASS -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+    if "$SSHPASS" -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
         -o UserKnownHostsFile=/dev/null "$user@$host" "[[ -d $deploy_dir/.git ]]" 2>/dev/null; then
         log_warn "Репозиторий уже существует в $deploy_dir"
         log_info "Обновление репозитория..."
-        $SSHPASS -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+        "$SSHPASS" -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
             -o UserKnownHostsFile=/dev/null "$user@$host" \
             "cd $deploy_dir && git pull origin main" || {
             log_error "Не удалось обновить репозиторий"
@@ -229,7 +239,7 @@ deploy_repo() {
         if [[ "$source" =~ ^(https?|git|ssh):// ]]; then
             # Это git URL
             log_info "Клонирование из: $source"
-            $SSHPASS -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+            "$SSHPASS" -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
                 -o UserKnownHostsFile=/dev/null "$user@$host" \
                 "git clone $source $deploy_dir" || {
                 log_error "Не удалось клонировать репозиторий"
@@ -243,7 +253,7 @@ deploy_repo() {
             fi
             
             log_info "Копирование локального репозитория: $source"
-            $SSHPASS -p "$SSH_PASSWORD" rsync -e "ssh -p $port" -avz --exclude='.git' --exclude='.env' \
+            "$SSHPASS" -p "$SSH_PASSWORD" rsync -e "ssh -p $port" -avz --exclude='.git' --exclude='.env' \
                 "$source/" "$user@$host:$deploy_dir/" || {
                 log_error "Не удалось скопировать репозиторий"
                 return 1
@@ -275,14 +285,14 @@ upload_env() {
     log_warn ""
     
     log_info "Копирование .env на сервер..."
-    $SSHPASS -p "$SSH_PASSWORD" scp -P "$port" -o StrictHostKeyChecking=accept-new \
+    "$SSHPASS" -p "$SSH_PASSWORD" scp -P "$port" -o StrictHostKeyChecking=accept-new \
         -o UserKnownHostsFile=/dev/null "$env_source" "$user@$host:$deploy_dir/.env" || {
         log_error "Не удалось загрузить .env"
         return 1
     }
     
     # Установить правильные права доступа
-    $SSHPASS -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+    "$SSHPASS" -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
         -o UserKnownHostsFile=/dev/null "$user@$host" "chmod 600 $deploy_dir/.env" || {
         log_error "Не удалось установить права доступа на .env"
         return 1
