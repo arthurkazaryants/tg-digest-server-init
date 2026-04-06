@@ -124,10 +124,10 @@ NEW_USER_SHELL=/bin/bash
 # === SSH ===
 SSH_PORT=2222
 # 👇 ВАЖНО: Вставь СОДЕРЖИМОЕ твоего ~/.ssh/id_ed25519.pub (НЕ путь!)
-SSH_PUBLIC_KEY=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID... your-email@example.com
+SSH_PUBLIC_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID... your-email@example.com"
 
 # === ДОСТУП ===
-ALLOW_USERS=deploy root
+ALLOW_USERS=deploy
 
 # === ПАРАМЕТРЫ BOOTSTRAP ===
 REMOTE_ROOT_USER=root
@@ -264,6 +264,11 @@ ssh -p 2222 deploy@192.168.1.100
 - ❌ Не закрывай старую сессию!
 - ❌ Вернись в старое подключение
 - ❌ Проверь конфиг и переделай
+
+**💡 Важно о root:**
+- Root login отключен через `PermitRootLogin no`
+- Для root операций используй `sudo` от пользователя `deploy`
+- Это измеримо повышает безопасность сервера
 
 ## Финализация hardening
 
