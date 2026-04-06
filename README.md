@@ -100,7 +100,7 @@ ssh-keygen -t ed25519 -C "your-email@example.com"
 
 **Клонируй этот репозиторий:**
 ```bash
-git clone https://github.com/your-name/tg-digest-server-init.git
+git clone https://github.com/arthurkazaryants/tg-digest-server-init.git
 cd tg-digest-server-init
 ```
 
@@ -165,7 +165,7 @@ ssh -p 22 root@192.168.1.100
 **Запусти скрипт:**
 ```bash
 chmod +x scripts-local/bootstrap-remote.sh
-./scripts-local/bootstrap-remote.sh .env https://github.com/your-name/tg-digest-server-init.git
+./scripts-local/bootstrap-remote.sh .env https://github.com/arthurkazaryants/tg-digest-server-init.git
 ```
 
 **Скрипт запросит пароль:**
@@ -180,12 +180,12 @@ chmod +x scripts-local/bootstrap-remote.sh
 
 **Или передай пароль через переменную окружения (безопаснее):**
 ```bash
-SSH_PASSWORD="your-password" ./scripts-local/bootstrap-remote.sh .env https://github.com/your-name/tg-digest-server-init.git
+SSH_PASSWORD="your-password" ./scripts-local/bootstrap-remote.sh .env https://github.com/arthurkazaryants/tg-digest-server-init.git
 ```
 
 **Или через параметр (менее безопасно, видно в истории):**
 ```bash
-./scripts-local/bootstrap-remote.sh .env https://github.com/your-name/tg-digest-server-init.git --password "your-password"
+./scripts-local/bootstrap-remote.sh .env https://github.com/arthurkazaryants/tg-digest-server-init.git --password "your-password"
 ```
 
 **С локальной копией вместо git:**
