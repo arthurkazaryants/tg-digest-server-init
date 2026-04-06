@@ -214,7 +214,33 @@ deploy_repo() {
             log_error "Не удалось обновить репозиторий"
             return 1
         }
+    elif "$SSHPASS_BIN" -e ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$user@$host" "[[ -d $deploy_dir ]]" 2>/dev/null; then
+        # Директория существует но не является git репо
+        log_warn "Директория $deploy_dir существует но не является git репозиторием"
+        log_info "Удаляю директорию и клонирую репозиторий..."
+        "$SSHPASS_BIN" -e ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile=/dev/null "$user@$host" \
+            "rm -rf $deploy_dir" || {
+            log_error "Не удалось удалить директорию"
+            return 1
+        }
+        
+        # Теперь клонируем в пустую директорию
+        if [[ "$source" =~ ^(https?|git|ssh):// ]] || [[ "$source" =~ ^git@ ]]; then
+            log_info "Клонирование из: $source"
+            "$SSHPASS_BIN" -e ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+                -o UserKnownHostsFile=/dev/null "$user@$host" \
+                "git clone $source $deploy_dir" || {
+                log_error "Не удалось клонировать репозиторий"
+                return 1
+            }
+        else
+            log_error "Локальный путь не поддерживается при повторной инициализации"
+            return 1
+        fi
     else
+        # Директория не существует - клонируем свежую копию
         # Определить источник - URL или локальный путь
         if [[ "$source" =~ ^(https?|git|ssh):// ]] || [[ "$source" =~ ^git@ ]]; then
             # Это git URL - использовать как есть
