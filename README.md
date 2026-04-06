@@ -37,8 +37,8 @@ tg-digest-server-init/
 ├── scripts/                            # Серверные скрипты (запускаются удалённо)
 │   ├── 01-base.sh                     # Базовая настройка системы
 │   ├── 02-user.sh                     # Создание пользователя и SSH
-│   ├── 03-firewall.sh                 # Настройка UFW
-│   ├── 04-ssh-hardening.sh            # SSH Hardening (КРИТИЧНО)
+│   ├── 03-ssh-hardening.sh            # SSH Hardening (КРИТИЧНО)
+│   ├── 04-firewall.sh                 # Настройка UFW
 │   ├── 05-fail2ban.sh                 # Защита от brute-force
 │   ├── 06-docker-optional.sh          # Установка Docker (опционально)
 │   └── 90-verify.sh                   # Проверка конфигурации
@@ -239,9 +239,9 @@ sudo bash bootstrap.sh
 **Этапы автоматически:**
 - ✅ 01-base.sh - Базовая система + hostname + timezone
 - ✅ 02-user.sh - Создание пользователя + SSH ключ
-- ✅ 03-firewall.sh - UFW (откроет новый SSH порт)
-- ⚠️ 04-ssh-hardening.sh - **ОСТАНАВЛИВАЕТСЯ** (требует APPLY_SSH_CHANGES=true)
-- ⚠️ 05-fail2ban.sh - Защита от brute-force
+- ⚠️ 03-ssh-hardening.sh - **Подготавливает SSH на новом порту** (требует APPLY_SSH_CHANGES=true)
+- ✅ 04-firewall.sh - UFW (открывает уже переведенный SSH порт)
+- ✅ 05-fail2ban.sh - Защита от brute-force
 - ✅ 06-docker-optional.sh - Docker (если ENABLE_DOCKER=true)
 - ✅ 90-verify.sh - Проверка всего
 
@@ -311,7 +311,7 @@ FINALIZE_FIREWALL=true
 sudo bash bootstrap.sh
 ```
 
-**Этап 04-ssh-hardening.sh теперь:**
+**Этап 03-ssh-hardening.sh теперь:**
 - Применит drop-in конфиг SSH
 - Перезагрузит SSH сервис
 - Отключит root login (окончательно)

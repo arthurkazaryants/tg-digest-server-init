@@ -59,8 +59,8 @@ run_script() {
 # Основной порядок выполнения
 run_script "01-base.sh"
 run_script "02-user.sh"
-run_script "03-firewall.sh"
-run_script "04-ssh-hardening.sh"
+run_script "03-ssh-hardening.sh"  # ВАЖНО: ДО firewall! Подготавливает SSH на новом порту
+run_script "04-firewall.sh"       # Открывает уже переведенный SSH порт
 run_script "05-fail2ban.sh"
 
 # Docker опциональный

@@ -9,6 +9,7 @@ require_root
 load_env "${SCRIPT_DIR}/.env"
 
 log_info "========== Настройка UFW firewall =========="
+log_info "ВАЖНО: SSH уже переведен на порт $SSH_PORT на предыдущем этапе"
 
 require_var "SSH_PORT"
 
