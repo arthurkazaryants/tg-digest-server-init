@@ -168,14 +168,24 @@ chmod +x scripts-local/bootstrap-remote.sh
 ./scripts-local/bootstrap-remote.sh .env https://github.com/your-name/tg-digest-server-init.git
 ```
 
+**Скрипт запросит:**
+```
+==========================================
+Требуется пароль для SSH подключения
+==========================================
+Введи пароль SSH: 
+```
+
+Введи пароль root пользователя сервера (будет скрыт при вводе).
+
 **Или с локальной копией вместо git:**
 ```bash
 ./scripts-local/bootstrap-remote.sh .env /path/to/local/repo
 ```
 
 **Скрипт сделает:**
-- Проверит SSH подключение
-- Установит git на сервере
+- Проверит SSH подключение (с паролем)
+- Установит git на сервере если требуется
 - Скопирует репозиторий в `/opt/server-bootstrap`
 - Загрузит `.env` файл безопасно
 
