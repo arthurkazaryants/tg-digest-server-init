@@ -136,44 +136,25 @@ test_ssh_connection() {
     
     log_info "Проверка SSH подключения к ${user}@${host}:${port}..."
     log_info "DEBUG: SSHPASS='$SSHPASS'"
+    log_info "DEBUG: file -x check: $(test -x "$SSHPASS" && echo 'OK' || echo 'FAIL')"
     
     # Проверить что sshpass доступен
     if [[ ! -x "$SSHPASS" ]]; then
         log_error "ОШИБКА: $SSHPASS не найден или не исполняемый"
-        log_error "Пожалуйста, установи sshpass:"
-        log_error "  brew install sshpass"
         return 1
     fi
     
-    log_info "DEBUG: Запуск: $SSHPASS -p [пароль] ssh ..."
+    # Просто запустить сшpass без компликаций
+    log_info "DEBUG: Запуск sshpass..."
     
-    # Напрямую выполнить команду without output capture сначала
-    if "$SSHPASS" -p "$SSH_PASSWORD" ssh -p "$port" -o ConnectTimeout=5 \
-        -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
-        "$user@$host" "echo 'SSH OK'" 2>&1 | head -3; then
+    if eval "\"$SSHPASS\" -p \"\$SSH_PASSWORD\" ssh -p \"$port\" -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \"$user@$host\" \"echo 'SSH OK'\" 2>&1"; then
         log_success "SSH подключение успешно"
         return 0
     else
         local exit_code=$?
         log_error "SSH подключение не удалось (код: $exit_code)"
-        log_error "Проверь:"
-        log_error "  - REMOTE_HOST: $host"
-        log_error "  - REMOTE_ROOT_PORT: $port"
-        log_error "  - REMOTE_ROOT_USER: $user"
-        log_error "  - Пароль SSH правильный"
-        
-        # Дополнительная диагностика для кода 255 (общая ошибка SSH)
-        if [[ $exit_code -eq 255 ]]; then
-            log_error ""
-            log_error "SSH ошибка 255 может означать:"
-            log_error "  - Неправильный пароль"
-            log_error "  - Сервер отказывает в доступе"
-            log_error "  - Проблемы с подключением к хосту"
-            log_error ""
-            log_error "Попробуй подключиться вручную:"
-            log_error "  ssh -p $port $user@$host"
-        fi
-        
+        log_error "Попробуй подключиться вручную для диагностики:"
+        log_error "  ssh -p $port $user@$host"
         return 1
     fi
 }
