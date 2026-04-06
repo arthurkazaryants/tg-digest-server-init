@@ -54,8 +54,12 @@ apt-get install -y -qq \
     docker-ce-cli \
     containerd.io \
     docker-compose-plugin \
-    docker-buildx-plugin \
-    docker-scan-plugin
+    docker-buildx-plugin
+
+# docker-scan-plugin может быть недоступен в некоторых версиях
+# Пытаемся установить, но не фейлим если не найден
+apt-get install -y -qq docker-scan-plugin 2>/dev/null || \
+    log_warn "docker-scan-plugin недоступен (необязательный пакет)"
 
 log_success "Docker установлен"
 
