@@ -210,7 +210,7 @@ deploy_repo() {
         log_info "Обновление репозитория..."
         "$SSHPASS_BIN" -e ssh -p "$port" -o StrictHostKeyChecking=accept-new \
             -o UserKnownHostsFile=/dev/null "$user@$host" \
-            "cd $deploy_dir && git pull origin main" || {
+            "cd $deploy_dir && git pull origin master" || {
             log_error "Не удалось обновить репозиторий"
             return 1
         }
