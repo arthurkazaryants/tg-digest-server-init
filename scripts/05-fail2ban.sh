@@ -74,14 +74,31 @@ log_info "Перезагрузка Fail2Ban..."
 systemctl enable fail2ban
 systemctl restart fail2ban
 
-# Подождать инициализации
-sleep 2
+# Подождать инициализации и наличия сокета
+log_info "Ожидание инициализации Fail2Ban..."
+max_attempts=30
+attempt=0
+while [[ $attempt -lt $max_attempts ]]; do
+    if fail2ban-client ping &> /dev/null; then
+        break
+    fi
+    attempt=$((attempt + 1))
+    if [[ $attempt -lt $max_attempts ]]; then
+        sleep 0.2
+    fi
+done
+
+if [[ $attempt -eq $max_attempts ]]; then
+    log_warn "Fail2Ban не ответил в срок, но сервис запущен"
+else
+    log_success "Fail2Ban готов к работе"
+fi
 
 log_success "Fail2Ban включен"
 
-# Вывести статус
+# Вывести статус (неблокирующее)
 log_info "Статус Fail2Ban:"
-fail2ban-client status
+fail2ban-client status || log_warn "Не удалось получить полный статус Fail2Ban (сервис инициализируется)"
 
 log_info "Статус sshd jail:"
 fail2ban-client status sshd || log_warn "sshd jail еще не инициализирован"
