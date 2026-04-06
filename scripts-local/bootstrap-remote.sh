@@ -7,16 +7,16 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Найти sshpass в стандартных локациях
-if ! SSHPASS=$(command -v sshpass 2>/dev/null); then
+if ! SSHPASS_BIN=$(command -v sshpass 2>/dev/null); then
     # Попробовать обычные пути для macOS и Linux
     for path in /usr/bin/sshpass /usr/local/bin/sshpass /opt/homebrew/bin/sshpass; do
         if [[ -x "$path" ]]; then
-            SSHPASS="$path"
+            SSHPASS_BIN="$path"
             break
         fi
     done
     
-    if [[ -z "${SSHPASS:-}" ]]; then
+    if [[ -z "${SSHPASS_BIN:-}" ]]; then
         echo "[ERROR] sshpass не найден в PATH. Установи его:"
         echo "  macOS: brew install sshpass"
         echo "  Linux: apt-get install sshpass"
@@ -24,7 +24,7 @@ if ! SSHPASS=$(command -v sshpass 2>/dev/null); then
     fi
 fi
 
-export SSHPASS
+export SSHPASS_BIN
 
 # Цвета для вывода (локально)
 RED='\033[0;31m'
@@ -96,7 +96,7 @@ load_config() {
 # Запросить пароль SSH (интерактивно)
 prompt_ssh_password() {
     # Если пароль уже установлен, пропустить
-    if [[ -n "${SSH_PASSWORD:-}" ]]; then
+    if [[ -n "${SSHPASS:-}" ]]; then
         log_success "Пароль SSH уже установлен"
         return 0
     fi
@@ -104,16 +104,16 @@ prompt_ssh_password() {
     log_warn "=========================================="
     log_warn "Требуется пароль для SSH подключения"
     log_warn "=========================================="
-    read -sp "Введи пароль SSH: " SSH_PASSWORD
+    read -sp "Введи пароль SSH: " SSHPASS
     echo ""
     
     # Проверить что пароль не пустой
-    if [[ -z "$SSH_PASSWORD" ]]; then
+    if [[ -z "$SSHPASS" ]]; then
         log_error "Пароль не может быть пустым"
         exit 1
     fi
     
-    export SSH_PASSWORD
+    export SSHPASS
     log_success "Пароль принят"
 }
 
@@ -135,19 +135,20 @@ test_ssh_connection() {
     local user=$3
     
     log_info "Проверка SSH подключения к ${user}@${host}:${port}..."
-    log_info "DEBUG: SSHPASS='$SSHPASS'"
-    log_info "DEBUG: file -x check: $(test -x "$SSHPASS" && echo 'OK' || echo 'FAIL')"
+    log_info "DEBUG: SSHPASS_BIN='$SSHPASS_BIN'"
+    log_info "DEBUG: SSHPASS пароль установлен: $(test -n "${SSHPASS:-}" && echo 'yes' || echo 'no')"
     
     # Проверить что sshpass доступен
-    if [[ ! -x "$SSHPASS" ]]; then
-        log_error "ОШИБКА: $SSHPASS не найден или не исполняемый"
+    if [[ ! -x "$SSHPASS_BIN" ]]; then
+        log_error "ОШИБКА: $SSHPASS_BIN не найден или не исполняемый"
         return 1
     fi
     
-    # Просто запустить сшpass без компликаций
-    log_info "DEBUG: Запуск sshpass..."
+    log_info "DEBUG: Запуск sshpass с флагом -e (переменная окружения SSHPASS)..."
     
-    if eval "\"$SSHPASS\" -p \"\$SSH_PASSWORD\" ssh -p \"$port\" -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \"$user@$host\" \"echo 'SSH OK'\" 2>&1"; then
+    # Использовать переменную окружения SSHPASS для пароля (флаг -e)
+    if "$SSHPASS_BIN" -e ssh -p "$port" -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$user@$host" "echo 'SSH OK'" 2>&1; then
         log_success "SSH подключение успешно"
         return 0
     else
@@ -167,13 +168,16 @@ ensure_git_on_server() {
     
     log_info "Проверка git на сервере..."
     
-    if eval "\"$SSHPASS\" -p \"\$SSH_PASSWORD\" ssh -p \"$port\" -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \"$user@$host\" \"command -v git\" > /dev/null 2>&1"; then
+    if "$SSHPASS_BIN" -e ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$user@$host" "command -v git" > /dev/null 2>&1; then
         log_success "git уже установлен на сервере"
         return 0
     fi
     
     log_warn "git не найден, устанавливаю..."
-    eval "\"$SSHPASS\" -p \"\$SSH_PASSWORD\" ssh -p \"$port\" -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \"$user@$host\" \"apt-get update -qq && apt-get install -y git\"" || {
+    "$SSHPASS_BIN" -e ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$user@$host" \
+        "apt-get update -qq && apt-get install -y git" || {
         log_error "Не удалось установить git на сервере"
         return 1
     }
@@ -193,16 +197,20 @@ deploy_repo() {
     
     # Создать директорию если её нет
     log_info "Создание директории: $deploy_dir"
-    eval "\"$SSHPASS\" -p \"\$SSH_PASSWORD\" ssh -p \"$port\" -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \"$user@$host\" \"mkdir -p $deploy_dir\"" || {
+    "$SSHPASS_BIN" -e ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$user@$host" "mkdir -p $deploy_dir" || {
         log_error "Не удалось создать директорию"
         return 1
     }
     
     # Проверить есть ли уже репозиторий
-    if eval "\"$SSHPASS\" -p \"\$SSH_PASSWORD\" ssh -p \"$port\" -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \"$user@$host\" \"[[ -d $deploy_dir/.git ]]\" 2>/dev/null"; then
+    if "$SSHPASS_BIN" -e ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$user@$host" "[[ -d $deploy_dir/.git ]]" 2>/dev/null; then
         log_warn "Репозиторий уже существует в $deploy_dir"
         log_info "Обновление репозитория..."
-        eval "\"$SSHPASS\" -p \"\$SSH_PASSWORD\" ssh -p \"$port\" -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \"$user@$host\" \"cd $deploy_dir && git pull origin main\"" || {
+        "$SSHPASS_BIN" -e ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile=/dev/null "$user@$host" \
+            "cd $deploy_dir && git pull origin main" || {
             log_error "Не удалось обновить репозиторий"
             return 1
         }
@@ -211,7 +219,9 @@ deploy_repo() {
         if [[ "$source" =~ ^(https?|git|ssh):// ]] || [[ "$source" =~ ^git@ ]]; then
             # Это git URL - использовать как есть
             log_info "Клонирование из: $source"
-            eval "\"$SSHPASS\" -p \"\$SSH_PASSWORD\" ssh -p \"$port\" -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \"$user@$host\" \"git clone $source $deploy_dir\"" || {
+            "$SSHPASS_BIN" -e ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+                -o UserKnownHostsFile=/dev/null "$user@$host" \
+                "git clone $source $deploy_dir" || {
                 log_error "Не удалось клонировать репозиторий"
                 return 1
             }
@@ -223,7 +233,7 @@ deploy_repo() {
             fi
             
             log_info "Копирование локального репозитория: $source"
-            "$SSHPASS" -p "$SSH_PASSWORD" rsync -e "ssh -p $port" -avz --exclude='.git' --exclude='.env' \
+            "$SSHPASS_BIN" -e rsync -e "ssh -p $port" -avz --exclude='.git' --exclude='.env' \
                 "$source/" "$user@$host:$deploy_dir/" || {
                 log_error "Не удалось скопировать репозиторий"
                 return 1
@@ -255,13 +265,15 @@ upload_env() {
     log_warn ""
     
     log_info "Копирование .env на сервер..."
-    eval "\"$SSHPASS\" -p \"\$SSH_PASSWORD\" scp -P \"$port\" -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \"$env_source\" \"$user@$host:$deploy_dir/.env\"" || {
+    "$SSHPASS_BIN" -e scp -P "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$env_source" "$user@$host:$deploy_dir/.env" || {
         log_error "Не удалось загрузить .env"
         return 1
     }
     
     # Установить правильные права доступа
-    eval "\"$SSHPASS\" -p \"\$SSH_PASSWORD\" ssh -p \"$port\" -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \"$user@$host\" \"chmod 600 $deploy_dir/.env\"" || {
+    "$SSHPASS_BIN" -e ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$user@$host" "chmod 600 $deploy_dir/.env" || {
         log_error "Не удалось установить права доступа на .env"
         return 1
     }
@@ -303,7 +315,7 @@ main() {
                     log_error "--password требует значение"
                     exit 1
                 fi
-                export SSH_PASSWORD="$2"
+                export SSHPASS="$2"
                 log_warn "⚠️  Пароль SSH передан в параметре командной строки"
                 log_warn "Это видно в истории и процессах - используй для тестирования только!"
                 shift 2
