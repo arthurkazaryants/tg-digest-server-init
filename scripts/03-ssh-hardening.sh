@@ -81,7 +81,7 @@ fi
 
 # Применить изменения
 log_info "Перезагружаю SSH сервис..."
-systemctl reload ssh
+systemctl restart ssh
 
 log_success "SSH сервис перезагружен на порту $SSH_PORT"
 log_warn "=========================================="
