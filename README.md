@@ -180,7 +180,7 @@ chmod +x scripts-local/bootstrap-remote.sh
 
 **Или передай пароль через переменную окружения (безопаснее):**
 ```bash
-SSH_PASSWORD="your-password" ./scripts-local/bootstrap-remote.sh .env https://github.com/arthurkazaryants/tg-digest-server-init.git
+SSHPASS="your-password" ./scripts-local/bootstrap-remote.sh .env https://github.com/arthurkazaryants/tg-digest-server-init.git
 ```
 
 **Или через параметр (менее безопасно, видно в истории):**
