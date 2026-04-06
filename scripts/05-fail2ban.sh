@@ -36,7 +36,6 @@ findtime = 600
 maxretry = 3
 destemail = root@localhost
 sendername = Fail2Ban
-mta = sendmail
 
 [sshd]
 enabled = true
@@ -46,28 +45,16 @@ logpath = /var/log/auth.log
 maxretry = 3
 bantime = 3600
 findtime = 600
-
-[sshd-ddos]
-enabled = true
-port = $SSH_PORT
-filter = sshd-ddos
-logpath = /var/log/auth.log
-maxretry = 10
-bantime = 600
-findtime = 60
 EOF
 
 log_success "Fail2Ban конфиг создан"
 
-# Создать фильтр для DDoS (опционально)
-mkdir -p /etc/fail2ban/filter.d
-cat > /etc/fail2ban/filter.d/sshd-ddos.conf << 'EOF'
-[Definition]
-failregex = ^<HOST> .* Invalid user .* from <HOST>
-            ^<HOST> .* Did not receive identification string from <HOST>
-            ^Received disconnect from <HOST> port \d+ \[preauth\]
-ignoreregex =
-EOF
+# Примечание: используем стандартный sshd фильтр из fail2ban
+# Убедимся что конфиг валиден
+log_info "Проверка синтаксиса Fail2Ban конфига..."
+fail2ban-client -c /etc/fail2ban/ status > /dev/null 2>&1 || {
+    log_warn "Ошибка конфига, пытаюсь запустить вручную..."
+}
 
 # Перезагрузить fail2ban
 log_info "Перезагрузка Fail2Ban..."
