@@ -4,10 +4,20 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Убедиться что запущено от root
+if [[ $EUID -ne 0 ]]; then
+    echo "[ERROR] Этот скрипт должен быть запущен от root"
+    exit 1
+fi
+
+# Создать директорию для логов ПЕРЕД загрузкой common.sh
+LOG_DIR="/var/log/tg-digest-server-init"
+mkdir -p "$LOG_DIR"
+
 # Загрузить общие функции
 source "${SCRIPT_DIR}/lib/common.sh"
 
-# Убедиться что запущено от root
+# Убедиться что запущено от root (повторно для common.sh)
 require_root
 
 # Загрузить переменные окружения
