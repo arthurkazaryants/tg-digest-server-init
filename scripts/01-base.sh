@@ -76,7 +76,7 @@ fi
 
 # Настроить swap (опционально)
 if [[ "${ENABLE_SWAP:-false}" == "true" ]]; then
-    local swap_size="${SWAP_SIZE_GB:-2}"
+    swap_size="${SWAP_SIZE_GB:-2}"
     
     if ! swapon --show | grep -q /swapfile; then
         log_info "Создание swap файла (${swap_size}G)..."
