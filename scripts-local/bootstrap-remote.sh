@@ -41,6 +41,19 @@ check_local_tools() {
         fi
     done
     
+    # Проверить sshpass для поддержки пароля
+    if ! command -v sshpass &> /dev/null; then
+        log_warn "sshpass не найден. Установка требуется для поддержки пароля..."
+        if command -v brew &> /dev/null; then
+            brew install sshpass
+        elif command -v apt-get &> /dev/null; then
+            sudo apt-get install -y sshpass
+        else
+            log_error "Не удалось установить sshpass. Установите вручную."
+            exit 1
+        fi
+    fi
+    
     log_success "Все инструменты присутствуют"
 }
 
@@ -58,6 +71,17 @@ load_config() {
     set +a
     
     log_info "Конфиг загружен: $env_file"
+}
+
+# Запросить пароль SSH (интерактивно)
+prompt_ssh_password() {
+    log_warn "=========================================="
+    log_warn "Требуется пароль для SSH подключения"
+    log_warn "=========================================="
+    read -sp "Введи пароль SSH: " SSH_PASSWORD
+    echo ""
+    export SSH_PASSWORD
+    log_success "Пароль принят"
 }
 
 # Проверка требуемых переменных
@@ -79,7 +103,8 @@ test_ssh_connection() {
     
     log_info "Проверка SSH подключения к ${user}@${host}:${port}..."
     
-    if timeout 5 ssh -p "$port" -o ConnectTimeout=3 -o StrictHostKeyChecking=accept-new \
+    if timeout 5 sshpass -p "$SSH_PASSWORD" ssh -p "$port" -o ConnectTimeout=3 \
+        -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
         "$user@$host" "echo 'SSH OK'" > /dev/null 2>&1; then
         log_success "SSH подключение успешно"
         return 0
@@ -89,7 +114,7 @@ test_ssh_connection() {
         log_error "  - REMOTE_HOST: $host"
         log_error "  - REMOTE_ROOT_PORT: $port"
         log_error "  - REMOTE_ROOT_USER: $user"
-        log_error "  - SSH ключ добавлен на сервер"
+        log_error "  - Пароль SSH правильный"
         return 1
     fi
 }
@@ -102,13 +127,16 @@ ensure_git_on_server() {
     
     log_info "Проверка git на сервере..."
     
-    if ssh -p "$port" "$user@$host" "command -v git" > /dev/null 2>&1; then
+    if sshpass -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$user@$host" "command -v git" > /dev/null 2>&1; then
         log_success "git уже установлен на сервере"
         return 0
     fi
     
     log_warn "git не найден, устанавливаю..."
-    ssh -p "$port" "$user@$host" "apt-get update -qq && apt-get install -y git" || {
+    sshpass -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$user@$host" \
+        "apt-get update -qq && apt-get install -y git" || {
         log_error "Не удалось установить git на сервере"
         return 1
     }
@@ -128,16 +156,20 @@ deploy_repo() {
     
     # Создать директорию если её нет
     log_info "Создание директории: $deploy_dir"
-    ssh -p "$port" "$user@$host" "mkdir -p $deploy_dir" || {
+    sshpass -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$user@$host" "mkdir -p $deploy_dir" || {
         log_error "Не удалось создать директорию"
         return 1
     }
     
     # Проверить есть ли уже репозиторий
-    if ssh -p "$port" "$user@$host" "[[ -d $deploy_dir/.git ]]" 2>/dev/null; then
+    if sshpass -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$user@$host" "[[ -d $deploy_dir/.git ]]" 2>/dev/null; then
         log_warn "Репозиторий уже существует в $deploy_dir"
         log_info "Обновление репозитория..."
-        ssh -p "$port" "$user@$host" "cd $deploy_dir && git pull origin main" || {
+        sshpass -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+            -o UserKnownHostsFile=/dev/null "$user@$host" \
+            "cd $deploy_dir && git pull origin main" || {
             log_error "Не удалось обновить репозиторий"
             return 1
         }
@@ -146,7 +178,9 @@ deploy_repo() {
         if [[ "$source" =~ ^(https?|git|ssh):// ]]; then
             # Это git URL
             log_info "Клонирование из: $source"
-            ssh -p "$port" "$user@$host" "git clone $source $deploy_dir" || {
+            sshpass -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+                -o UserKnownHostsFile=/dev/null "$user@$host" \
+                "git clone $source $deploy_dir" || {
                 log_error "Не удалось клонировать репозиторий"
                 return 1
             }
@@ -158,7 +192,7 @@ deploy_repo() {
             fi
             
             log_info "Копирование локального репозитория: $source"
-            rsync -e "ssh -p $port" -avz --exclude='.git' --exclude='.env' \
+            sshpass -p "$SSH_PASSWORD" rsync -e "ssh -p $port" -avz --exclude='.git' --exclude='.env' \
                 "$source/" "$user@$host:$deploy_dir/" || {
                 log_error "Не удалось скопировать репозиторий"
                 return 1
@@ -190,13 +224,15 @@ upload_env() {
     log_warn ""
     
     log_info "Копирование .env на сервер..."
-    scp -P "$port" "$env_source" "$user@$host:$deploy_dir/.env" || {
+    sshpass -p "$SSH_PASSWORD" scp -P "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$env_source" "$user@$host:$deploy_dir/.env" || {
         log_error "Не удалось загрузить .env"
         return 1
     }
     
     # Установить правильные права доступа
-    ssh -p "$port" "$user@$host" "chmod 600 $deploy_dir/.env" || {
+    sshpass -p "$SSH_PASSWORD" ssh -p "$port" -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile=/dev/null "$user@$host" "chmod 600 $deploy_dir/.env" || {
         log_error "Не удалось установить права доступа на .env"
         return 1
     }
@@ -235,6 +271,9 @@ main() {
     
     # Проверить локальные инструменты
     check_local_tools
+    
+    # Запросить пароль SSH
+    prompt_ssh_password
     
     echo ""
     log_info "=========================================="
