@@ -58,21 +58,19 @@ if [[ "${ENABLE_UNATTENDED_UPGRADES:-true}" == "true" ]]; then
 fi
 
 # Настроить journald логи
-if [[ -d /etc/systemd/journald.conf.d ]]; then
-    log_info "Настройка systemd journald..."
-    
-    mkdir -p /etc/systemd/journald.conf.d
-    
-    cat > /etc/systemd/journald.conf.d/99-pet-limits.conf << 'EOF'
+log_info "Настройка systemd journald..."
+
+mkdir -p /etc/systemd/journald.conf.d
+
+cat > /etc/systemd/journald.conf.d/99-pet-limits.conf << 'EOF'
 [Journal]
 SystemMaxUse=1G
 RuntimeMaxUse=256M
 MaxRetentionSec=14d
 EOF
-    
-    systemctl restart systemd-journald
-    log_success "journald логи настроены"
-fi
+
+systemctl restart systemd-journald
+log_success "journald логи настроены"
 
 # Настроить swap (опционально)
 if [[ "${ENABLE_SWAP:-false}" == "true" ]]; then
