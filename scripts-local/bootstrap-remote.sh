@@ -145,18 +145,16 @@ test_ssh_connection() {
         return 1
     fi
     
-    local output
-    local exit_code=0
+    log_info "DEBUG: Запуск: $SSHPASS -p [пароль] ssh ..."
     
-    # Использовать полный путь с кавычками для безопасности
-    output=$(timeout 10 "$SSHPASS" -p "$SSH_PASSWORD" ssh -p "$port" -o ConnectTimeout=5 \
+    # Напрямую выполнить команду without output capture сначала
+    if "$SSHPASS" -p "$SSH_PASSWORD" ssh -p "$port" -o ConnectTimeout=5 \
         -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
-        "$user@$host" "echo 'SSH OK'" 2>&1) || exit_code=$?
-    
-    if [[ $exit_code -eq 0 ]]; then
+        "$user@$host" "echo 'SSH OK'" 2>&1 | head -3; then
         log_success "SSH подключение успешно"
         return 0
     else
+        local exit_code=$?
         log_error "SSH подключение не удалось (код: $exit_code)"
         log_error "Проверь:"
         log_error "  - REMOTE_HOST: $host"
