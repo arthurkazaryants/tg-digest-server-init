@@ -75,11 +75,24 @@ load_config() {
 
 # Запросить пароль SSH (интерактивно)
 prompt_ssh_password() {
+    # Если пароль уже установлен, пропустить
+    if [[ -n "${SSH_PASSWORD:-}" ]]; then
+        log_success "Пароль SSH уже установлен"
+        return 0
+    fi
+    
     log_warn "=========================================="
     log_warn "Требуется пароль для SSH подключения"
     log_warn "=========================================="
     read -sp "Введи пароль SSH: " SSH_PASSWORD
     echo ""
+    
+    # Проверить что пароль не пустой
+    if [[ -z "$SSH_PASSWORD" ]]; then
+        log_error "Пароль не может быть пустым"
+        exit 1
+    fi
+    
     export SSH_PASSWORD
     log_success "Пароль принят"
 }
@@ -103,18 +116,36 @@ test_ssh_connection() {
     
     log_info "Проверка SSH подключения к ${user}@${host}:${port}..."
     
-    if timeout 5 sshpass -p "$SSH_PASSWORD" ssh -p "$port" -o ConnectTimeout=3 \
+    local output
+    local exit_code=0
+    
+    output=$(timeout 10 sshpass -p "$SSH_PASSWORD" ssh -p "$port" -o ConnectTimeout=5 \
         -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null \
-        "$user@$host" "echo 'SSH OK'" > /dev/null 2>&1; then
+        "$user@$host" "echo 'SSH OK'" 2>&1) || exit_code=$?
+    
+    if [[ $exit_code -eq 0 ]]; then
         log_success "SSH подключение успешно"
         return 0
     else
-        log_error "SSH подключение не удалось"
+        log_error "SSH подключение не удалось (код: $exit_code)"
         log_error "Проверь:"
         log_error "  - REMOTE_HOST: $host"
         log_error "  - REMOTE_ROOT_PORT: $port"
         log_error "  - REMOTE_ROOT_USER: $user"
         log_error "  - Пароль SSH правильный"
+        
+        # Дополнительная диагностика для кода 255 (общая ошибка SSH)
+        if [[ $exit_code -eq 255 ]]; then
+            log_error ""
+            log_error "SSH ошибка 255 может означать:"
+            log_error "  - Неправильный пароль"
+            log_error "  - Сервер отказывает в доступе"
+            log_error "  - Проблемы с подключением к хосту"
+            log_error ""
+            log_error "Попробуй подключиться вручную:"
+            log_error "  ssh -p $port $user@$host"
+        fi
+        
         return 1
     fi
 }
@@ -246,19 +277,45 @@ main() {
     log_info "Tg Digest server init - Локальная часть"
     log_info "=========================================="
     
-    # Различны режимы использования
+    # Различные режимы использования
     if [[ $# -lt 2 ]]; then
         log_error "Использование:"
-        log_error "  $0 <.env файл> <git URL или локальный путь>"
+        log_error "  $0 <.env файл> <git URL или локальный путь> [опции]"
         log_error ""
-        log_error "Пример:"
+        log_error "Опции:"
+        log_error "  --password <пароль>   Передать пароль SSH в аргументе (небезопасно, видно в ps)"
+        log_error ""
+        log_error "Примеры:"
         log_error "  $0 .env https://github.com/user/tg-digest-server-init.git"
         log_error "  $0 .env /path/to/local/repo"
+        log_error "  SSH_PASSWORD='mypass' $0 .env https://github.com/user/tg-digest-server-init.git"
+        log_error "  $0 .env https://github.com/user/tg-digest-server-init.git --password 'mypass'"
         exit 1
     fi
     
     local env_file="$1"
     local repo_source="$2"
+    
+    # Парсить оставшиеся параметры
+    shift 2
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --password)
+                if [[ -z "${2:-}" ]]; then
+                    log_error "--password требует значение"
+                    exit 1
+                fi
+                export SSH_PASSWORD="$2"
+                log_warn "⚠️  Пароль SSH передан в параметре командной строки"
+                log_warn "Это видно в истории и процессах - используй для тестирования только!"
+                shift 2
+                ;;
+            *)
+                log_error "Неизвестный параметр: $1"
+                exit 1
+                ;;
+        esac
+    done
     
     # Загрузить конфиг
     load_config "$env_file"
@@ -272,7 +329,7 @@ main() {
     # Проверить локальные инструменты
     check_local_tools
     
-    # Запросить пароль SSH
+    # Запросить пароль SSH если не установлен
     prompt_ssh_password
     
     echo ""

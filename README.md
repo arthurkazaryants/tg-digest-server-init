@@ -168,17 +168,27 @@ chmod +x scripts-local/bootstrap-remote.sh
 ./scripts-local/bootstrap-remote.sh .env https://github.com/your-name/tg-digest-server-init.git
 ```
 
-**Скрипт запросит:**
+**Скрипт запросит пароль:**
 ```
 ==========================================
 Требуется пароль для SSH подключения
 ==========================================
-Введи пароль SSH: 
+Введи пароль SSH: [скрытый ввод]
 ```
 
-Введи пароль root пользователя сервера (будет скрыт при вводе).
+Введи пароль root пользователя сервера.
 
-**Или с локальной копией вместо git:**
+**Или передай пароль через переменную окружения (безопаснее):**
+```bash
+SSH_PASSWORD="your-password" ./scripts-local/bootstrap-remote.sh .env https://github.com/your-name/tg-digest-server-init.git
+```
+
+**Или через параметр (менее безопасно, видно в истории):**
+```bash
+./scripts-local/bootstrap-remote.sh .env https://github.com/your-name/tg-digest-server-init.git --password "your-password"
+```
+
+**С локальной копией вместо git:**
 ```bash
 ./scripts-local/bootstrap-remote.sh .env /path/to/local/repo
 ```
