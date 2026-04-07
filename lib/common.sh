@@ -135,22 +135,37 @@ user_exists() {
     id "$user" &> /dev/null
 }
 
-# Создание пользователя с sudo доступом
+# Генерация безопасного пароля
+generate_password() {
+    # Генерировать 16 символов с буквами, цифрами и спецсимволами
+    openssl rand -base64 12 | tr -d "=+/" | cut -c1-16
+}
+
+# Создание пользователя с паролем
 create_user() {
     local user=$1
     local shell=${2:-/bin/bash}
+    local password=$(generate_password)
     
     if user_exists "$user"; then
         log_warn "Пользователь уже существует: $user"
         return 0
     fi
     
+    # Создать пользователя
     useradd -m -s "$shell" -G sudo "$user"
     log_success "Пользователь создан: $user"
     
-    # Не требовать пароль для sudo
-    append_if_missing "$user ALL=(ALL) NOPASSWD:ALL" /etc/sudoers.d/"$user"
+    # Установить пароль
+    echo "$user:$password" | chpasswd
+    log_info "Пароль установлен для: $user"
+    
+    # Требовать пароль для sudo (более безопасно)
+    append_if_missing "$user ALL=(ALL) ALL" /etc/sudoers.d/"$user"
     chmod 0440 /etc/sudoers.d/"$user"
+    
+    # Сохранить пароль в переменную для вывода
+    echo "$password"
 }
 
 # Настройка SSH authorized_keys
@@ -201,4 +216,4 @@ export -f log log_info log_success log_warn log_error
 export -f require_var require_command require_root require_flag
 export -f load_env init_logging backup_file
 export -f verify_sshd_config reload_sshd_safe append_if_missing
-export -f user_exists create_user setup_ssh_key
+export -f user_exists create_user setup_ssh_key generate_password
