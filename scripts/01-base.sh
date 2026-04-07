@@ -38,6 +38,13 @@ log_success "Базовые утилиты установлены"
 if [[ ! -z "${SERVER_HOSTNAME:-}" ]]; then
     log_info "Установка hostname на: $SERVER_HOSTNAME"
     hostnamectl set-hostname "$SERVER_HOSTNAME"
+    
+    # Добавить hostname в /etc/hosts для локального разрешения адреса (предотвращает sudo: unable to resolve host)
+    if ! grep -q "127.0.0.1.*${SERVER_HOSTNAME}" /etc/hosts; then
+        log_info "Добавляю hostname в /etc/hosts..."
+        echo "127.0.0.1 $SERVER_HOSTNAME" >> /etc/hosts
+    fi
+    
     log_success "Hostname установлен"
 fi
 
